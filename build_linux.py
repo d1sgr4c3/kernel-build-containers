@@ -56,7 +56,7 @@ def finish_building_kernel(out_dir, interrupt):
     print(f'The finish_container.sh script returned {return_code}')
 
 
-def build_kernel(arch, kconfig, src, out, compiler, make_args):
+def build_kernel(arch, kconfig, src, out, compiler, podman, make_args):
     print(f'\n=== Building with {compiler} ===')
 
     if kconfig:
@@ -90,8 +90,12 @@ def build_kernel(arch, kconfig, src, out, compiler, make_args):
     else:
         print('No kconfig to copy to output subdirectory')
 
-    start_container_cmd = ['bash', os.path.dirname(os.path.abspath(__file__)) + '/start_container.sh',
-                                   compiler, src, out_subdir]
+    if podman:
+        start_container_cmd = ['bash', os.path.dirname(os.path.abspath(__file__)) + '/start_container.sh',
+                                       compiler, src, out_subdir, '-p']
+    else:
+        start_container_cmd = ['bash', os.path.dirname(os.path.abspath(__file__)) + '/start_container.sh',
+                                       compiler, src, out_subdir]
 
     noninteractive = True
     if 'menuconfig' in make_args:
@@ -161,6 +165,8 @@ def main():
                         help='for running `make` in quiet mode')
     parser.add_argument('-t', '--single-thread', action='store_true',
                         help='for running `make` in single-threaded mode (multi-threaded by default)')
+    parser.add_argument('-p', '--podman', action='store_true',
+                        help='use podman runtime instead of docker')
     parser.add_argument('make_args', metavar='...', nargs=argparse.REMAINDER,
                         help='additional arguments for \'make\', can be separated by -- delimiter')
     args = parser.parse_args()
@@ -210,7 +216,7 @@ def main():
     else:
         print('[+] Going to run \'make\' in single-threaded mode')
 
-    build_kernel(args.arch, args.kconfig, args.src, args.out, args.compiler, make_args)
+    build_kernel(args.arch, args.kconfig, args.src, args.out, args.compiler, args.podman, make_args)
 
     print('\n[+] Done, see the results')
 

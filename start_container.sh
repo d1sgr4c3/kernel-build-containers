@@ -1,11 +1,12 @@
 #!/bin/bash
 
 print_help() {
-	echo "usage: $0 compiler src_dir out_dir [-n] [-e VAR] [-h] [-v] [-- cmd with args]"
+	echo "usage: $0 compiler src_dir out_dir [-n] [-e VAR] [-h] [-v] [-p] [-- cmd with args]"
 	echo "  -n    launch container in non-interactive mode"
 	echo "  -e    add environment variable in the container (may be used multiple times)"
 	echo "  -h    print this help"
 	echo "  -v    enable debug output"
+	echo "  -p    use podman runtime instead of docker"
 	echo ""
 	echo "  If cmd is empty, we will start an interactive bash in the container."
 }
@@ -37,6 +38,7 @@ shift 3
 CIDFILE=""
 ENV=""
 INTERACTIVE="-it"
+RUNTIME="docker"
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
@@ -53,6 +55,10 @@ while [[ $# -gt 0 ]]; do
 		;;
 	-v | --verbose)
 		set -x
+		shift
+		;;
+	-p | --podman)
+		RUNTIME="podman"
 		shift
 		;;
 	-h | --help)
@@ -91,7 +97,7 @@ else
 fi
 
 # Z for setting SELinux label
-exec $SUDO_CMD docker run $ENV $INTERACTIVE $CIDFILE --rm \
+exec $SUDO_CMD $RUNTIME run $ENV $INTERACTIVE $CIDFILE --rm \
 	-v $SRC:/src:Z \
 	-v $OUT:/out:Z \
 	kernel-build-container:$COMPILER "$@"

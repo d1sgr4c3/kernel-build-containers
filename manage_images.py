@@ -24,6 +24,7 @@ class ContainerImage:
 
     Class Attributes:
         runtime_cmd (List): commands for calling the container runtime
+        runtime (str): docker/podman flag
         quiet (bool): quiet mode for hiding the container image build log
 
     Instance Attributes:
@@ -37,6 +38,7 @@ class ContainerImage:
 
     runtime_cmd = None
     quiet = False
+    runtime = 'docker'
 
     def __init__(self, clang_version, gcc_version, ubuntu_version):
         if not ContainerImage.runtime_cmd:
@@ -87,6 +89,7 @@ class ContainerImage:
     def find_id(self):
         """Find the ID of the container image. Return an empty string if it doesn't exist."""
         find_clang_cmd = self.runtime_cmd + ['images', self.clang_tag, '--format', '{{.ID}}']
+        print(find_clang_cmd)
         out = subprocess.run(find_clang_cmd, text=True, check=True, stdout=subprocess.PIPE)
         clang_id = out.stdout.strip()
         if clang_id:
@@ -97,18 +100,21 @@ class ContainerImage:
             if not gcc_id:
                 sys.exit(f'[!] ERROR: Invalid image "{self.clang_tag}" ' \
                           'without the corresponding GCC tag, remove it manually')
-        return clang_id
+        if self.runtime == 'docker':
+            return clang_id
+        elif self.runtime == 'podman':
+            return clang_id.split()[0] if clang_id else None
 
     def identify_runtime_cmd(self):
         """Identify the commands for working with the container runtime"""
         try:
-            cmd = ['docker', 'ps']
+            cmd = [self.runtime, 'ps']
             out = subprocess.run(cmd, text=True, check=False, capture_output=True)
             if out.returncode == 0:
-                return ['docker']
+                return [self.runtime]
             if 'permission denied' in out.stderr:
                 print('We need "sudo" for working with containers')
-                return ['sudo', 'docker']
+                return ['sudo', self.runtime]
             sys.exit(f'[!] ERROR: Testing "{" ".join(cmd)}" gives unknown error:\n{out.stderr}')
         except FileNotFoundError:
             sys.exit('[!] ERROR: The container runtime is not installed')
@@ -155,6 +161,8 @@ def main():
                         help='suppress the container image build output (for using with --build)')
     parser.add_argument('-r', '--remove', action='store_true',
                         help='remove all created images')
+    parser.add_argument('-p', '--podman', action='store_true',
+                        help='use podman runtime instead of docker')
     args = parser.parse_args()
 
     if not any((args.list, args.build, args.remove)):
@@ -168,6 +176,9 @@ def main():
         if not args.build:
             sys.exit('[!] ERROR: "--quiet" should be used only with the "--build" option')
         ContainerImage.quiet = True
+
+    if args.podman:
+        ContainerImage.runtime = 'podman'
 
     images = []
     images += [ContainerImage('5', '4.9', '16.04')]
