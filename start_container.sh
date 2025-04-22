@@ -11,19 +11,6 @@ print_help() {
 	echo "  If cmd is empty, we will start an interactive bash in the container."
 }
 
-groups | grep '\<docker\>' > /dev/null
-NEED_SUDO=$?
-
-set -eu
-
-if [ $NEED_SUDO -eq 1 ]; then
-	echo "Hey, we gonna use sudo for running docker"
-	SUDO_CMD="sudo"
-else
-	echo "Hey, you are in docker group, sudo is not needed"
-	SUDO_CMD=""
-fi
-
 if [ $# -lt 3 ]; then
 	print_help
 	exit 1
@@ -38,14 +25,14 @@ shift 3
 CIDFILE=""
 ENV=""
 INTERACTIVE="-it"
-RUNTIME="docker"
+IMAGE_ENGINE="docker"
 
 while [[ $# -gt 0 ]]; do
 	case $1 in
 	-n | --non-interactive)
 		INTERACTIVE=""
 		CIDFILE="--cidfile $OUT/container.id"
-		echo "Run docker in NON-interactive mode"
+		echo "Run image engine in NON-interactive mode"
 		shift
 		;;
 	-e | --env)
@@ -58,7 +45,7 @@ while [[ $# -gt 0 ]]; do
 		shift
 		;;
 	-p | --podman)
-		RUNTIME="podman"
+		IMAGE_ENGINE="podman"
 		shift
 		;;
 	-h | --help)
@@ -77,6 +64,20 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+output=$($IMAGE_ENGINE ps 2>&1)
+
+set -eu 
+if echo "$output" | grep -qi "permission denied" && [ "$IMAGE_ENGINE" = "docker" ]; then
+	echo "Hey, we gonna use sudo for running docker"
+	SUDO_CMD="sudo"
+elif [ "$IMAGE_ENGINE" = "podman" ]; then
+    echo "Hey, you are running podman, sudo is not needed"
+    SUDO_CMD=""
+else
+    echo "Hey, you are in docker group, sudo is not needed"
+    SUDO_CMD=""
+fi
+
 echo "Starting \"kernel-build-container:$COMPILER\""
 
 if [ ! -z "$ENV" ]; then
@@ -84,7 +85,7 @@ if [ ! -z "$ENV" ]; then
 fi
 
 if [ ! -z $INTERACTIVE ]; then
-	echo "Gonna run docker in interactive mode"
+	echo "Gonna run $IMAGE_ENGINE in interactive mode"
 fi
 
 echo "Mount source code directory \"$SRC\" at \"/src\""
@@ -97,7 +98,7 @@ else
 fi
 
 # Z for setting SELinux label
-exec $SUDO_CMD $RUNTIME run $ENV $INTERACTIVE $CIDFILE --rm \
+exec $SUDO_CMD $IMAGE_ENGINE run $ENV $INTERACTIVE $CIDFILE --rm \
 	-v $SRC:/src:Z \
 	-v $OUT:/out:Z \
 	kernel-build-container:$COMPILER "$@"

@@ -90,12 +90,10 @@ def build_kernel(arch, kconfig, src, out, compiler, podman, make_args):
     else:
         print('No kconfig to copy to output subdirectory')
 
+    start_container_cmd = ['bash', os.path.dirname(os.path.abspath(__file__)) + '/start_container.sh', compiler, src, out_subdir] 
+
     if podman:
-        start_container_cmd = ['bash', os.path.dirname(os.path.abspath(__file__)) + '/start_container.sh',
-                                       compiler, src, out_subdir, '-p']
-    else:
-        start_container_cmd = ['bash', os.path.dirname(os.path.abspath(__file__)) + '/start_container.sh',
-                                       compiler, src, out_subdir]
+        start_container_cmd.append('-p')
 
     noninteractive = True
     if 'menuconfig' in make_args:
